@@ -36,5 +36,8 @@ def isStringEmpty(string:str) -> bool:
 def buildBaseId(group:str, serial:str) -> str:
   return '{0}_{1}'.format(group, serial)
 
-def buildValuesTopic(group:str, serial:str) -> str:
-  return '{0}/{1}'.format(group, serial)
+def buildValuesTopic(group:str, serial:str, suffix:str=None) -> str:
+  if not isStringEmpty(suffix):
+    return '{0}/{1}/{2}'.format(group, serial, suffix)
+  else:
+    return '{0}/{1}'.format(group, serial)

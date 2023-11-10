@@ -7,9 +7,12 @@ This library provides some reusable modules used in other projects
 It is tested on a Raspberry Pi 3B running Raspberry Pi OS, and data may be sent in Home Assistant format (it is able to declare itself on Home Assistant)
 
 
-## Presentation
+## List of modules
 
-Some help tools to reduce boiler code in some circumstances
+  - ```misc.py``` : very simple methods (strings, ...) and classes (JSON encoder, ...)
+  - ```mqtt.py``` : simplified mqtt client
+  - ```httpapi.py``` : integrated http server for API calls
+  - ```devnval.py``` : devices and values classes, compatible with Home Assistant over MQTT
 
 
 ## Dependencies

@@ -13,6 +13,10 @@
 from misc import *
 
 
+TOPIC_STATE:str = 'state'
+TOPIC_ATTRIBUTES:str = 'attributes'
+
+
 #
 # Classes
 #
@@ -65,11 +69,13 @@ class DeviceSettings:
     return res
 
 class DeclareValue:
-  def __init__(self, name:str, unit:str, tag:str, icon:str=None):
+  def __init__(self, name:str, unit:str, tag:str, icon:str=None, type:str='sensor', withAttrs:bool=False):
+    self.type:str = type.strip() if type is not None else 'sensor'
     self.name:str = name.strip() if name is not None else None
     self.unit:str = unit.strip() if unit is not None else None
     self.tag:str = tag.strip() if tag is not None else None
     self.icon:str = icon.strip() if icon is not None else None
+    self.withAttrs:bool = withAttrs if withAttrs is not None else False
 
   def toDict(self) -> dict:
     res:dict = {}
@@ -81,6 +87,8 @@ class DeclareValue:
       res['tag'] = self.tag
     if not isStringEmpty(self.icon):
       res['icon'] = self.icon
+    if not self.withAttrs is None:
+      res['withAttrs'] = self.withAttrs
     return res
 
 class DeclareHADevice:
@@ -107,7 +115,7 @@ class DeclareHADevice:
 
 class DeclareHAValue:
   def __init__(self, deviceSettings:DeviceSettings, declareValue:DeclareValue):
-    topic:str = buildValuesTopic(deviceSettings.group, deviceSettings.serial)
+    type:str = declareValue.type if not isStringEmpty(declareValue.type) and declareValue.type != 'sensor' else ''
 
     icon:str = declareValue.icon
     if isStringEmpty(icon):
@@ -115,20 +123,27 @@ class DeclareHAValue:
         icon = 'mdi:thermometer'
       elif declareValue.unit == 'kB':
         icon = 'mdi:memory'
+      elif declareValue.unit == 'km' or declareValue.unit == 'mi':
+        icon = 'mdi:counter'
       else:
         icon = 'mdi:eye'
 
     self.device:DeclareHADevice = DeclareHADevice(deviceSettings)
     self.enabled_by_default:bool = True
-    self.entity_category:str = 'diagnostic'
+    #self.entity_category:str = 'diagnostic'
     self.icon:str = icon
-    self.json_attributes_topic = topic
     self.name = declareValue.name
-    self.state_class = 'measurement'
-    self.state_topic = topic
     self.unique_id = deviceSettings.serial + '_' + declareValue.tag + '_' + deviceSettings.group
     self.unit_of_measurement = declareValue.unit
+    self.state_class = 'measurement'
+    self.state_topic = buildValuesTopic(deviceSettings.group, deviceSettings.serial, TOPIC_STATE)
     self.value_template = '{{ ' + 'value_json.{0}'.format(declareValue.tag) + ' }}'
+    if declareValue.withAttrs is not None and declareValue.withAttrs:
+      self.json_attributes_topic = buildValuesTopic(deviceSettings.group, deviceSettings.serial, TOPIC_ATTRIBUTES)
+
+    if type == 'binary_sensor':
+      self.payload_on = 'on'
+      self.payload_off = 'off'
 
   def toDict(self) -> dict:
     res:dict = {}

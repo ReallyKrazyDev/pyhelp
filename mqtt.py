@@ -69,12 +69,17 @@ def buildMqttClient(settings:MqttSettings) -> MqttClient.Client :
   return client
 
 def declareValues2HAMqtt(client:MqttClient.Client, deviceSettings:DeviceSettings, declareValues:[DeclareValue]):
+  type:str = None
   topic:str = None
   payload:str = None
   declareHAValue:DeclareHAValue = None
   for declareValue in declareValues:
-    topic = 'homeassistant/sensor/{0}/{1}/config'.format(deviceSettings.serial, declareValue.tag)
-    #topic = 'fakedecl/sensor/{0}/{1}/config'.format(deviceSettings.serial, declareValue.tag)
+    type = declareValue.type if not isStringEmpty(declareValue.type) else 'sensor'
+    topic = 'homeassistant/{0}/{1}/{2}/config'.format( \
+      type,
+      deviceSettings.serial, \
+      declareValue.tag
+    )
     declareHAValue = DeclareHAValue(deviceSettings, declareValue)
     payload = json.dumps(declareHAValue, cls=JsonEncoder)
     client.publish(topic, payload, qos=0, retain=True)
@@ -113,13 +118,41 @@ def declareValues2Mqtt(deviceSettings:DeviceSettings, mqttSettings:MqttSettings,
   client.connect(mqttSettings.hostname, mqttSettings.port)
   return True
 
+def _adaptValues2Mqtt(values:object, mqttSettings:MqttSettings) -> list :
+  if mqttSettings.isHA:
+    state = {}
+    attributes = {}
+    for attr, value in vars(values).items():
+      if not attr.startswith('_') and value is not None:
+        if isinstance(value, dict):
+          for dictAttr in value:
+            lowerDictAttr = dictAttr.lower()
+            if 'latitude' in lowerDictAttr:
+              attributes['latitude'] = value[dictAttr]
+            elif 'longitude' in lowerDictAttr:
+              attributes['longitude'] = value[dictAttr]
+        elif isinstance(value, bool):
+          state[attr] = 'on' if value else 'off'
+        else:
+          state[attr] = value
+      elif attr == '_evLocation' and isinstance(value, dict):
+        attributes['latitude'] = value['latitude']
+        attributes['longitude'] = value['longitude']
+    return [state, attributes]
+  else:
+    return [values]
+
 def sendValues2Mqtt(values:object, deviceSettings:DeviceSettings, mqttSettings:MqttSettings) -> bool:
   if not deviceSettings.isSet() or not mqttSettings.isSet():
     return False
   def onValuesMqttConnect(client, userdata, flags, rc):
     if rc == 0:
       try:
-        client.publish(buildValuesTopic(deviceSettings.group, deviceSettings.serial), json.dumps(values, cls=JsonEncoder))
+        adaptValues = _adaptValues2Mqtt(values, mqttSettings)
+        if len(adaptValues[0]) > 0:
+          client.publish(buildValuesTopic(deviceSettings.group, deviceSettings.serial, TOPIC_STATE if mqttSettings.isHA else None), json.dumps(adaptValues[0], cls=JsonEncoder))
+        if len(adaptValues[1]) > 0:
+          client.publish(buildValuesTopic(deviceSettings.group, deviceSettings.serial, TOPIC_ATTRIBUTES), json.dumps(adaptValues[1], cls=JsonEncoder))
       except Exception as excp:
         print('Failed to send values : ' + str(excp))
       try:

@@ -12,7 +12,7 @@
 #
 # Dependencies
 #
-# pip install flask flask-httpauth
+# pip install flask flask-httpauth pyopenssl werkzeug
 
 
 from misc import *
@@ -20,11 +20,16 @@ from misc import *
 from flask import Flask
 from flask_httpauth import HTTPBasicAuth
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 class HttpApiSettings:
   def __init__(self, settingsDict:dict=None):
     self.host:str = None
     self.port:int = None
+    self.certPath:str = None
+    self.certKeyPath:str = None
+    self.sslContext:object = 'adhoc'
     self.users:dict[str, str] = None
 
     if settingsDict is not None:
@@ -32,12 +37,21 @@ class HttpApiSettings:
         self.host = settingsDict['host']
       if 'port' in settingsDict:
         self.port = int(settingsDict['port'])
+      if 'certPath' in settingsDict:
+        self.certPath = settingsDict['certPath']
+      if 'certKeyPath' in settingsDict:
+        self.certKeyPath = settingsDict['certKeyPath']
+      if 'sslContext' in settingsDict:
+        self.sslContext = settingsDict['sslContext']
       if 'users' in settingsDict:
         self.users = settingsDict['users']
 
   def isSet(self) -> bool:
     return True
 
+
+def generatePasswordHash(password:str) -> str:
+  return generate_password_hash(password)
 
 def dispHttpApiSettings(settings:HttpApiSettings, tab:str=''):
   print('{0}host={1}'.format(tab, settings.host))
@@ -51,7 +65,7 @@ def buildHttpApi(appName:str, settings:HttpApiSettings) -> Flask:
   if settings.users is not None and len(settings.users) > 0:
     @auth.verify_password
     def verify_password(username, password):
-      if settings.users is not None and username in settings.users and settings.users[username] == password:
+      if settings.users is not None and username in settings.users and check_password_hash(settings.users[username], password):
         return username
       else:
         return None
@@ -65,4 +79,8 @@ def buildHttpApi(appName:str, settings:HttpApiSettings) -> Flask:
 def runHttpApi(flask:Flask, settings:HttpApiSettings):
   host:str = settings.host if not isStringEmpty(settings.host) else None
   port:int = settings.port
-  flask.run(host=host, port=port)
+
+  sslContext:object = settings.sslContext
+  if not isStringEmpty(settings.certPath) and not isStringEmpty(settings.certKeyPath):
+    sslContext = (settings.certPath, settings.certKeyPath)
+  flask.run(host=host, port=port, ssl_context=sslContext)
