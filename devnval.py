@@ -38,7 +38,7 @@ class DeviceSettings:
       if 'manufacturer' in settingsDict:
         self.manufacturer = settingsDict['manufacturer']
       if 'model' in settingsDict:
-        self.serial = settingsDict['model']
+        self.model = settingsDict['model']
       if 'version' in settingsDict:
         self.version = settingsDict['version']
       if 'name' in settingsDict:
